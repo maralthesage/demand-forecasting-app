@@ -219,10 +219,15 @@ jobs:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && (github.event.inputs.deploy_environment == 'production' || github.event.inputs.deploy_environment == null)
     environment: production
+    permissions:
+      contents: write  # Needed for creating and pushing tags
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0  # Needed for git operations
     
     - name: Download Docker image
       uses: actions/download-artifact@v4
@@ -257,10 +262,18 @@ jobs:
     
     - name: Create deployment tag
       run: |
+        echo "🏷️ Creating deployment tag..."
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        git tag -a "deploy-$(date +%Y%m%d-%H%M%S)" -m "Production deployment $(date)"
-        git push origin --tags
+        
+        # Create deployment tag
+        TAG_NAME="deploy-$(date +%Y%m%d-%H%M%S)"
+        git tag -a "$TAG_NAME" -m "Production deployment $(date)"
+        
+        # Push tag to repository
+        git push origin "$TAG_NAME"
+        echo "✅ Created and pushed deployment tag: $TAG_NAME"
+      continue-on-error: true  # Don't fail deployment if tagging fails
 
   notify:
     needs: [deploy-production, deploy-staging, data-processing]
