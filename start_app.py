@@ -88,7 +88,7 @@ def main():
     parser.add_argument("--port", type=int, default=8501, help="Port number")
     parser.add_argument("--data-path", help="Override data path")
     parser.add_argument(
-        "--daily-time", default="02:00", help="Daily processing time (HH:MM)"
+        "--daily-time", default="06:00", help="Daily processing time (HH:MM)"
     )
 
     args = parser.parse_args()
