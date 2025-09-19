@@ -55,7 +55,6 @@ jobs:
     - name: Run tests
       run: |
         python -m pytest tests/ --cov=. --cov-report=xml --cov-report=html -v
-      continue-on-error: true
       env:
         SALES_FORECAST_DATA_PATH: /tmp/test_data
     
@@ -216,9 +215,9 @@ jobs:
         echo "✅ Health checks passed"
 
   deploy-production:
-    needs: [test, build, deploy-staging]
+    needs: [test, build]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event.inputs.deploy_environment != 'staging'
+    if: github.ref == 'refs/heads/main' && (github.event.inputs.deploy_environment == 'production' || github.event.inputs.deploy_environment == null)
     environment: production
     
     steps:
@@ -292,6 +291,8 @@ jobs:
     needs: [deploy-production, deploy-staging]
     runs-on: ubuntu-latest
     if: always()
+    permissions:
+      actions: write
     
     steps:
     - name: Clean up artifacts
