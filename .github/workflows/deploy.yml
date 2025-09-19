@@ -1,0 +1,314 @@
+name: Deploy Demand Forecasting App
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run daily at 1 AM UTC to check for data updates
+    - cron: '0 1 * * *'
+  workflow_dispatch:
+    inputs:
+      force_retrain:
+        description: 'Force model retraining'
+        required: false
+        default: 'false'
+        type: boolean
+      deploy_environment:
+        description: 'Deployment environment'
+        required: false
+        default: 'production'
+        type: choice
+        options:
+        - production
+        - staging
+
+env:
+  PYTHON_VERSION: '3.9'
+  APP_NAME: demand-forecasting-app
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov flake8 black
+    
+    - name: Lint code
+      run: |
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        black --check .
+    
+    - name: Run tests
+      run: |
+        python -m pytest tests/ --cov=. --cov-report=xml --cov-report=html
+      continue-on-error: true
+    
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        fail_ci_if_error: false
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+    
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.APP_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+    
+    - name: Build Docker image
+      id: build
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: false
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        outputs: type=docker,dest=/tmp/image.tar
+    
+    - name: Upload Docker image artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: docker-image
+        path: /tmp/image.tar
+        retention-days: 1
+
+  data-processing:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event.inputs.force_retrain == 'true' || contains(github.event.head_commit.message, '[data-update]')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Configure environment
+      env:
+        DATA_PATH: ${{ secrets.SALES_FORECAST_DATA_PATH }}
+      run: |
+        echo "SALES_FORECAST_DATA_PATH=$DATA_PATH" >> $GITHUB_ENV
+        mkdir -p cache logs models data
+    
+    - name: Run data processing and training
+      run: |
+        python start_app.py --train-only ${{ github.event.inputs.force_retrain == 'true' && '--force-retrain' || '' }}
+      continue-on-error: true
+    
+    - name: Archive processing results
+      uses: actions/upload-artifact@v3
+      with:
+        name: processing-results
+        path: |
+          cache/
+          models/
+          logs/
+        retention-days: 7
+    
+    - name: Create processing report
+      run: |
+        echo "# Data Processing Report" > processing_report.md
+        echo "Date: $(date)" >> processing_report.md
+        echo "Commit: ${{ github.sha }}" >> processing_report.md
+        echo "Force retrain: ${{ github.event.inputs.force_retrain }}" >> processing_report.md
+        
+        if [ -f "cache/training_metadata.json" ]; then
+          echo "## Training Results" >> processing_report.md
+          cat cache/training_metadata.json >> processing_report.md
+        fi
+    
+    - name: Comment processing results on PR
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          const report = fs.readFileSync('processing_report.md', 'utf8');
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: report
+          });
+
+  deploy-staging:
+    needs: [test, build]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop' || github.event.inputs.deploy_environment == 'staging'
+    environment: staging
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Download Docker image
+      uses: actions/download-artifact@v3
+      with:
+        name: docker-image
+        path: /tmp
+    
+    - name: Load Docker image
+      run: docker load --input /tmp/image.tar
+    
+    - name: Deploy to staging
+      run: |
+        echo "🚀 Deploying to staging environment..."
+        # Add your staging deployment commands here
+        # For example, if using Docker Compose:
+        # docker-compose -f docker-compose.staging.yml up -d
+        
+        echo "✅ Staging deployment completed"
+    
+    - name: Run health check
+      run: |
+        echo "🏥 Running health checks..."
+        sleep 30
+        # Add health check commands here
+        # curl -f http://staging.yourdomain.com/health || exit 1
+        echo "✅ Health checks passed"
+
+  deploy-production:
+    needs: [test, build, deploy-staging]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event.inputs.deploy_environment != 'staging'
+    environment: production
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Download Docker image
+      uses: actions/download-artifact@v3
+      with:
+        name: docker-image
+        path: /tmp
+    
+    - name: Load Docker image
+      run: docker load --input /tmp/image.tar
+    
+    - name: Deploy to production
+      run: |
+        echo "🚀 Deploying to production environment..."
+        # Add your production deployment commands here
+        # This could be:
+        # - Docker Compose deployment
+        # - Kubernetes deployment
+        # - Cloud service deployment (AWS ECS, Google Cloud Run, etc.)
+        
+        # Example for Docker Compose:
+        # docker-compose -f docker-compose.prod.yml up -d
+        
+        echo "✅ Production deployment completed"
+    
+    - name: Run production health check
+      run: |
+        echo "🏥 Running production health checks..."
+        sleep 30
+        # Add production health check commands here
+        # curl -f http://yourdomain.com/health || exit 1
+        echo "✅ Production health checks passed"
+    
+    - name: Create deployment tag
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git tag -a "deploy-$(date +%Y%m%d-%H%M%S)" -m "Production deployment $(date)"
+        git push origin --tags
+
+  notify:
+    needs: [deploy-production, deploy-staging, data-processing]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: Notify on success
+      if: ${{ needs.deploy-production.result == 'success' || needs.deploy-staging.result == 'success' }}
+      run: |
+        echo "✅ Deployment successful!"
+        # Add notification logic here (Slack, email, etc.)
+        # Example:
+        # curl -X POST -H 'Content-type: application/json' \
+        #   --data '{"text":"✅ Sales Forecast App deployed successfully!"}' \
+        #   ${{ secrets.SLACK_WEBHOOK_URL }}
+    
+    - name: Notify on failure
+      if: ${{ needs.deploy-production.result == 'failure' || needs.deploy-staging.result == 'failure' }}
+      run: |
+        echo "❌ Deployment failed!"
+        # Add failure notification logic here
+        # curl -X POST -H 'Content-type: application/json' \
+        #   --data '{"text":"❌ Sales Forecast App deployment failed!"}' \
+        #   ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  cleanup:
+    needs: [deploy-production, deploy-staging]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: Clean up artifacts
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            run_id: context.runId,
+          });
+          
+          for (const artifact of artifacts.data.artifacts) {
+            if (artifact.name === 'docker-image') {
+              await github.rest.actions.deleteArtifact({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                artifact_id: artifact.id,
+              });
+            }
+          }

@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  demand-forecasting-app:
+    build: .
+    ports:
+      - "8501:8501"
+    environment:
+      - SALES_FORECAST_DATA_PATH=${SALES_FORECAST_DATA_PATH:-/data}
+      - DAILY_PROCESSING_TIME=${DAILY_PROCESSING_TIME:-02:00}
+      - PYTHONPATH=/app
+    volumes:
+      - ./cache:/app/cache
+      - ./logs:/app/logs
+      - ./models:/app/models
+      - ${SALES_FORECAST_DATA_PATH:-./data}:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.demand-forecast.rule=Host(`forecast.yourdomain.com`)"
+      - "traefik.http.routers.demand-forecast.tls=true"
+      - "traefik.http.routers.demand-forecast.tls.certresolver=letsencrypt"
+
+  # Optional: Add a reverse proxy
+  traefik:
+    image: traefik:v2.10
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.letsencrypt.acme.email=your-email@domain.com"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"  # Traefik dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./letsencrypt:/letsencrypt
+    restart: unless-stopped
