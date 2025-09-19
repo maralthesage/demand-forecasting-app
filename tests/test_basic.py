@@ -56,8 +56,12 @@ def test_project_structure():
     project_root = Path(__file__).parent.parent
 
     # Check key files exist (these are essential)
-    assert (project_root / "requirements.txt").exists(), f"requirements.txt not found in {project_root}"
-    assert (project_root / "config.py").exists(), f"config.py not found in {project_root}"
+    assert (
+        project_root / "requirements.txt"
+    ).exists(), f"requirements.txt not found in {project_root}"
+    assert (
+        project_root / "config.py"
+    ).exists(), f"config.py not found in {project_root}"
 
     # Check key directories exist (with better error messages)
     directories_to_check = ["models", "utils", "tests"]
@@ -71,7 +75,9 @@ def test_project_structure():
         assert data_dir.is_dir(), f"data path exists but is not a directory: {data_dir}"
         print(f"✅ Data directory found at {data_dir}")
     else:
-        print(f"ℹ️  Data directory not found at {data_dir} (this is expected in CI environments)")
+        print(
+            f"ℹ️  Data directory not found at {data_dir} (this is expected in CI environments)"
+        )
 
 
 if __name__ == "__main__":
