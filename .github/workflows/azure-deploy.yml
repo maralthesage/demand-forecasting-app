@@ -1,0 +1,304 @@
+name: Deploy to Azure
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'terraform/**'
+      - 'Dockerfile'
+      - 'continuous_app.py'
+      - 'requirements.txt'
+      - 'config.py'
+      - 'data/**'
+      - 'incremental_training_system.py'
+      - 'utils/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'terraform/**'
+      - 'Dockerfile'
+      - 'continuous_app.py'
+      - 'requirements.txt'
+      - 'config.py'
+      - 'data/**'
+      - 'incremental_training_system.py'
+      - 'utils/**'
+
+env:
+  AZURE_CONTAINER_REGISTRY: ${{ secrets.AZURE_CONTAINER_REGISTRY }}
+  RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
+  CONTAINER_NAME: ${{ secrets.AZURE_CONTAINER_NAME }}
+
+jobs:
+  # Plan job for pull requests
+  plan:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    environment: development
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+      
+      - name: Terraform Init
+        run: terraform init
+        working-directory: ./terraform
+      
+      - name: Terraform Validate
+        run: terraform validate
+        working-directory: ./terraform
+      
+      - name: Terraform Plan
+        run: terraform plan -no-color
+        working-directory: ./terraform
+        env:
+          TF_VAR_project_name: demand-forecast
+          TF_VAR_environment: dev
+          TF_VAR_location: East US
+          TF_VAR_container_cpu: 1
+          TF_VAR_container_memory: 2
+          TF_VAR_allowed_ssh_ips: "0.0.0.0/0"
+          TF_VAR_enable_monitoring: true
+          TF_VAR_enable_backup: false
+          TF_VAR_auto_shutdown_enabled: true
+          TF_VAR_auto_shutdown_time: "18:00"
+      
+      - name: Comment PR with Plan
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const plan = fs.readFileSync('terraform/terraform.tfplan', 'utf8');
+            const output = `## Terraform Plan
+            
+            <details>
+            <summary>Show Plan</summary>
+            
+            \`\`\`
+            ${plan}
+            \`\`\`
+            </details>`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            });
+
+  # Deploy job for main branch
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    needs: []
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+      
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Terraform Init
+        run: terraform init
+        working-directory: ./terraform
+      
+      - name: Terraform Validate
+        run: terraform validate
+        working-directory: ./terraform
+      
+      - name: Terraform Plan
+        run: terraform plan -out=tfplan
+        working-directory: ./terraform
+        env:
+          TF_VAR_project_name: demand-forecast
+          TF_VAR_environment: prod
+          TF_VAR_location: East US
+          TF_VAR_container_cpu: 4
+          TF_VAR_container_memory: 8
+          TF_VAR_allowed_ssh_ips: ${{ secrets.ALLOWED_SSH_IPS }}
+          TF_VAR_enable_monitoring: true
+          TF_VAR_enable_backup: true
+          TF_VAR_auto_shutdown_enabled: false
+          TF_VAR_storage_replication_type: GRS
+          TF_VAR_container_registry_sku: Premium
+      
+      - name: Terraform Apply
+        run: terraform apply -auto-approve tfplan
+        working-directory: ./terraform
+      
+      - name: Get Container Registry Info
+        id: acr
+        run: |
+          echo "registry_name=$(terraform output -raw container_registry_name)" >> $GITHUB_OUTPUT
+          echo "registry_url=$(terraform output -raw container_registry_login_server)" >> $GITHUB_OUTPUT
+        working-directory: ./terraform
+      
+      - name: Login to Azure Container Registry
+        run: az acr login --name ${{ steps.acr.outputs.registry_name }}
+      
+      - name: Build and Push Docker Image
+        run: |
+          docker buildx build \
+            --platform linux/amd64 \
+            --tag ${{ steps.acr.outputs.registry_url }}/demand-forecasting-app:latest \
+            --tag ${{ steps.acr.outputs.registry_url }}/demand-forecasting-app:${{ github.sha }} \
+            --push \
+            .
+      
+      - name: Restart Container Instance
+        run: |
+          RG_NAME=$(terraform output -raw resource_group_name)
+          CONTAINER_NAME=$(terraform output -raw container_instance_name)
+          az container restart --name $CONTAINER_NAME --resource-group $RG_NAME
+        working-directory: ./terraform
+      
+      - name: Get Deployment Info
+        id: deployment
+        run: |
+          echo "app_url=$(terraform output -raw application_url)" >> $GITHUB_OUTPUT
+          echo "resource_group=$(terraform output -raw resource_group_name)" >> $GITHUB_OUTPUT
+          echo "container_name=$(terraform output -raw container_instance_name)" >> $GITHUB_OUTPUT
+        working-directory: ./terraform
+      
+      - name: Wait for Application
+        run: |
+          APP_URL="${{ steps.deployment.outputs.app_url }}"
+          echo "Waiting for application to be ready at $APP_URL"
+          
+          for i in {1..30}; do
+            if curl -f -s "$APP_URL/_stcore/health" > /dev/null; then
+              echo "Application is ready!"
+              exit 0
+            fi
+            echo "Attempt $i/30: Application not ready yet, waiting 10 seconds..."
+            sleep 10
+          done
+          
+          echo "Application failed to start within 5 minutes"
+          exit 1
+      
+      - name: Create Deployment Summary
+        run: |
+          echo "## 🚀 Deployment Successful!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📊 Deployment Information" >> $GITHUB_STEP_SUMMARY
+          echo "- **Application URL**: ${{ steps.deployment.outputs.app_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Resource Group**: ${{ steps.deployment.outputs.resource_group }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Container Name**: ${{ steps.deployment.outputs.container_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image Tag**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔧 Useful Commands" >> $GITHUB_STEP_SUMMARY
+          echo "```bash" >> $GITHUB_STEP_SUMMARY
+          echo "# View logs" >> $GITHUB_STEP_SUMMARY
+          echo "az container logs --name ${{ steps.deployment.outputs.container_name }} --resource-group ${{ steps.deployment.outputs.resource_group }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "# Restart container" >> $GITHUB_STEP_SUMMARY
+          echo "az container restart --name ${{ steps.deployment.outputs.container_name }} --resource-group ${{ steps.deployment.outputs.resource_group }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "# View outputs" >> $GITHUB_STEP_SUMMARY
+          echo "terraform output" >> $GITHUB_STEP_SUMMARY
+          echo "```" >> $GITHUB_STEP_SUMMARY
+
+  # Test job after deployment
+  test:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    needs: deploy
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+      
+      - name: Get Application URL
+        id: app
+        run: |
+          echo "url=$(terraform output -raw application_url)" >> $GITHUB_OUTPUT
+        working-directory: ./terraform
+      
+      - name: Test Application Health
+        run: |
+          APP_URL="${{ steps.app.outputs.url }}"
+          echo "Testing application health at $APP_URL"
+          
+          # Test health endpoint
+          if curl -f -s "$APP_URL/_stcore/health" > /dev/null; then
+            echo "✅ Health check passed"
+          else
+            echo "❌ Health check failed"
+            exit 1
+          fi
+          
+          # Test main page
+          if curl -f -s "$APP_URL" > /dev/null; then
+            echo "✅ Main page accessible"
+          else
+            echo "❌ Main page not accessible"
+            exit 1
+          fi
+      
+      - name: Test Application Functionality
+        run: |
+          APP_URL="${{ steps.app.outputs.url }}"
+          echo "Testing application functionality..."
+          
+          # Test if the page contains expected elements
+          RESPONSE=$(curl -s "$APP_URL")
+          
+          if echo "$RESPONSE" | grep -q "Demand Forecasting"; then
+            echo "✅ Application title found"
+          else
+            echo "❌ Application title not found"
+            exit 1
+          fi
+          
+          if echo "$RESPONSE" | grep -q "Product Search"; then
+            echo "✅ Product search interface found"
+          else
+            echo "❌ Product search interface not found"
+            exit 1
+          fi
+      
+      - name: Create Test Summary
+        run: |
+          echo "## ✅ Application Tests Passed!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🧪 Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Health check endpoint responding" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Main page accessible" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Application title present" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Product search interface present" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🌐 Access Your Application" >> $GITHUB_STEP_SUMMARY
+          echo "Visit: ${{ steps.app.outputs.url }}" >> $GITHUB_STEP_SUMMARY

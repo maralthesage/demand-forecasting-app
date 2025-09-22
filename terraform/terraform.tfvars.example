@@ -1,0 +1,49 @@
+# Azure Demand Forecasting App - Example Variables File
+# Copy this file to terraform.tfvars and customize the values
+
+# Basic Configuration
+project_name = "demand-forecast"
+environment  = "prod"  # dev, staging, or prod
+location     = "East US"
+
+# Container Configuration
+container_cpu    = 2
+container_memory = 4  # GB
+
+# Security Configuration
+allowed_ssh_ips = "203.0.113.0/24"  # Replace with your IP range
+
+# DNS Configuration (Optional)
+create_dns_zone = false
+dns_zone_name   = "example.com"
+dns_record_name = "app"
+
+# Storage Configuration
+storage_account_tier         = "Standard"
+storage_replication_type     = "LRS"
+container_registry_sku       = "Basic"
+
+# Monitoring Configuration
+enable_monitoring     = true
+log_retention_days    = 30
+enable_backup         = true
+backup_retention_days = 30
+
+# Security Configuration
+enable_private_endpoints        = false
+enable_network_security_group   = true
+allowed_inbound_ports          = [8501, 443]
+
+# Cost Optimization
+auto_shutdown_enabled = false  # Set to true for dev environments
+auto_shutdown_time    = "18:00"
+
+# Tags
+tags = {
+  Project     = "Demand Forecasting"
+  Environment = "Production"
+  ManagedBy   = "Terraform"
+  Owner       = "Data Team"
+  CostCenter  = "Engineering"
+  Application = "Demand Forecasting App"
+}
