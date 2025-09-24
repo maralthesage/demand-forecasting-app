@@ -15,6 +15,7 @@ from background_scheduler import init_background_scheduler
 from incremental_training_system import incremental_system
 from config import get_config, STREAMLIT_CONFIG
 from utils.logger import get_logger
+from utils.config_loader import config_loader
 
 logger = get_logger(__name__)
 
@@ -79,6 +80,14 @@ st.markdown(
 def load_current_data():
     """Load current data and models - optimized version"""
     try:
+        # Load optimized configuration
+        optimized_config = config_loader.load_config()
+        
+        # Log optimization info
+        if optimized_config.get('performance_metrics'):
+            metrics = optimized_config['performance_metrics']
+            logger.info(f"Using optimized model with {metrics.get('improvement_percent', 0):.1f}% improvement")
+        
         features_data, forecaster, feature_columns = (
             incremental_system.quick_load_for_app()
         )

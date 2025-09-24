@@ -17,6 +17,7 @@ from data.data_loader import DataLoader
 from data.feature_engineering import FeatureEngineer
 from models.ensemble_model import ProductForecaster
 from utils.logger import get_logger
+from utils.config_loader import config_loader
 
 logger = get_logger(__name__)
 
@@ -392,6 +393,16 @@ class IncrementalTrainingSystem:
         logger.info("Quick loading for app startup...")
 
         try:
+            # Load optimized configuration
+            optimized_config = config_loader.load_config()
+            
+            # Use optimized feature selection
+            feature_config = config_loader.get_feature_selection()
+            selected_features = feature_config.get('selected_features', [])
+            
+            if selected_features:
+                logger.info(f"Using {len(selected_features)} optimized features")
+            
             # Try incremental update first (checks for new data)
             features_data, forecaster = self.incremental_update()
 

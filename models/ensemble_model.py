@@ -16,6 +16,7 @@ import xgboost as xgb
 import lightgbm as lgb
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
+from utils.config_loader import config_loader
 
 try:
     from prophet import Prophet
@@ -27,6 +28,7 @@ except ImportError:
 
 from models.base_model import BaseForecaster
 from utils.logger import get_logger
+from utils.config_loader import config_loader
 
 logger = get_logger(__name__)
 
@@ -36,33 +38,43 @@ class EnsembleForecaster(BaseForecaster):
 
     def __init__(self, models_config: Optional[Dict] = None):
         super().__init__("EnsembleForecaster")
-
-        # Default model configuration
-        self.models_config = models_config or {
-            "xgboost": {
-                "n_estimators": 200,
-                "max_depth": 6,
-                "learning_rate": 0.1,
-                "subsample": 0.8,
-                "colsample_bytree": 0.8,
-                "random_state": 42,
-            },
-            "lightgbm": {
-                "n_estimators": 200,
-                "max_depth": 6,
-                "learning_rate": 0.1,
-                "subsample": 0.8,
-                "colsample_bytree": 0.8,
-                "random_state": 42,
-                "verbosity": -1,
-            },
-            "random_forest": {
-                "n_estimators": 100,
-                "max_depth": 10,
-                "random_state": 42,
-                "n_jobs": -1,
-            },
-        }
+        
+        # Load optimized configuration
+        if models_config is None:
+            optimized_config = config_loader.get_model_config()
+            self.models_config = optimized_config
+            logger.info("Using optimized hyperparameters from config file")
+        else:
+            self.models_config = models_config
+            logger.info("Using provided hyperparameters")
+        
+        # Fallback to default if optimized config is empty
+        if not self.models_config:
+            self.models_config = {
+                "xgboost": {
+                    "n_estimators": 200,
+                    "max_depth": 6,
+                    "learning_rate": 0.1,
+                    "subsample": 0.8,
+                    "colsample_bytree": 0.8,
+                    "random_state": 42,
+                },
+                "lightgbm": {
+                    "n_estimators": 200,
+                    "max_depth": 6,
+                    "learning_rate": 0.1,
+                    "subsample": 0.8,
+                    "colsample_bytree": 0.8,
+                    "random_state": 42,
+                    "verbosity": -1,
+                },
+                "random_forest": {
+                    "n_estimators": 100,
+                    "max_depth": 10,
+                    "random_state": 42,
+                    "n_jobs": -1,
+                },
+            }
 
         self.models = {}
         self.weights = {}
