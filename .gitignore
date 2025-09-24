@@ -160,7 +160,7 @@ venv.bak/
 # Jupyter Notebook
 .ipynb_checkpoints/
 *.ipynb
-!notebooks/*.ipynb
+# !notebooks/*.ipynb
 
 # Sublime Text
 *.sublime-project
