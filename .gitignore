@@ -51,8 +51,11 @@ CSV/
 *.xlsx
 *.xls
 *.parquet
-*.json
 *.xml
+
+# JSON files (except optimized hyperparameters)
+*.json
+!notebooks/optimized_hyperparameters.json
 
 # Processed data outputs
 processed/
@@ -157,6 +160,7 @@ venv.bak/
 # Jupyter Notebook
 .ipynb_checkpoints/
 *.ipynb
+!notebooks/*.ipynb
 
 # Sublime Text
 *.sublime-project
