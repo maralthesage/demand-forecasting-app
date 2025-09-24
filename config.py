@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Dict, Any
 
 # Base paths
-BASE_DATA_PATH = os.getenv("SALES_FORECAST_DATA_PATH", "/Volumes/MARAL")
+BASE_DATA_PATH = "Z:/"
 PROJECT_ROOT = Path(__file__).parent
 
 # Data source paths
@@ -20,9 +20,9 @@ DATA_PATHS = {
     },
     "marketing_artikel": f"{BASE_DATA_PATH}/CSV/F01/V2AR1001.csv",  # BANUMMER, WARENGR columns
     "product_descriptions": f"{BASE_DATA_PATH}/CSV/F01/V2AR1002.csv",  # NUMMER, BANAME1, BANAME2 columns
-    "lager_history": f"{BASE_DATA_PATH}/lager_history/",  # To be defined
-    "catalog_data": f"{BASE_DATA_PATH}/catalog_data/",  # To be defined
-    "processed": f"{BASE_DATA_PATH}/Data/sales_forecast/",
+    "lager_history": f"{BASE_DATA_PATH}lager_history/",  # To be defined
+    "catalog_data": f"{BASE_DATA_PATH}catalog_data/",  # To be defined
+    "processed": f"{BASE_DATA_PATH}Data/sales_forecast/",
     "models": PROJECT_ROOT / "models",
     "cache": PROJECT_ROOT / "cache",
 }

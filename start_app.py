@@ -18,7 +18,7 @@ sys.path.insert(0, str(project_root))
 def setup_environment():
     """Set up environment variables and paths"""
     if "SALES_FORECAST_DATA_PATH" not in os.environ:
-        os.environ["SALES_FORECAST_DATA_PATH"] = "/Volumes/MARAL"
+        os.environ["SALES_FORECAST_DATA_PATH"] = "Z:/"
 
     os.environ["PYTHONPATH"] = str(project_root)
 

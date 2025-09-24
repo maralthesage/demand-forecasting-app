@@ -245,6 +245,7 @@ class IncrementalTrainingSystem:
             logger.error(f"Error loading from cache: {e}")
             raise e
 
+    
     def detect_new_data(self) -> Tuple[bool, pd.DataFrame]:
         """
         Detect new nachfrage data and products since last training
@@ -277,10 +278,10 @@ class IncrementalTrainingSystem:
                 logger.info("No new data detected")
                 return False, pd.DataFrame()
 
-            # Extract new data
-            new_data_mask = pd.Series(
-                list(zip(current_data["product_id"], current_data["MONAT"]))
-            ).isin(new_keys)
+            # Extract new data - FIXED VERSION
+            # Create a mask that properly aligns with the DataFrame index
+            current_combinations = list(zip(current_data["product_id"], current_data["MONAT"]))
+            new_data_mask = pd.Series(current_combinations, index=current_data.index).isin(new_keys)
             new_data = current_data[new_data_mask].copy()
 
             logger.info(
@@ -292,7 +293,8 @@ class IncrementalTrainingSystem:
         except Exception as e:
             logger.error(f"Error detecting new data: {e}")
             return False, pd.DataFrame()
-
+        
+        
     def incremental_update(self) -> Tuple[pd.DataFrame, ProductForecaster]:
         """
         Perform incremental update with new data
