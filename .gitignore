@@ -43,7 +43,7 @@ credentials.json
 # DATA DIRECTORIES
 # ================================
 
-# Raw data files - NEVER upload actual business data
+# Raw data files
 data/
 Data/
 CSV/
