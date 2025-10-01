@@ -1,0 +1,64 @@
+{
+  "feature_selection": {
+    "selected_features": [
+      "anz_produkt_normalized",
+      "PREIS",
+      "unit_preis",
+      "sales_rolling_max_6",
+      "sales_rolling_max_12",
+      "sales_cv_6",
+      "category_seasonal_index",
+      "trend_acceleration",
+      "price_rolling_mean_3",
+      "sales_norm_lag_6",
+      "month",
+      "trend_6",
+      "sales_rolling_max_3",
+      "sales_vs_category_3",
+      "sales_rolling_mean_6"
+    ],
+    "max_features": 15
+  },
+  "model_hyperparameters": {
+    "xgboost": {
+      "n_estimators": 303,
+      "max_depth": 10,
+      "learning_rate": 0.10487662447025792,
+      "subsample": 0.8493831368447333,
+      "colsample_bytree": 0.9578410352643851,
+      "reg_alpha": 9.18598441463103,
+      "reg_lambda": 5.51968716245559
+    },
+    "lightgbm": {
+      "n_estimators": 499,
+      "max_depth": 9,
+      "learning_rate": 0.1594880549905189,
+      "num_leaves": 64,
+      "subsample": 0.829623127594056,
+      "colsample_bytree": 0.9945381025198837,
+      "reg_alpha": 8.791421648929509,
+      "reg_lambda": 4.532145933162949
+    },
+    "random_forest": {
+      "n_estimators": 200,
+      "max_depth": 10,
+      "random_state": 42
+    }
+  },
+  "ensemble_weights": {
+    "xgboost": 0.10793173639787616,
+    "lightgbm": 0.008247804067011507,
+    "random_forest": 0.8838204595351122
+  },
+  "performance_metrics": {
+    "xgboost_mae": 1.1362494925657909,
+    "lightgbm_mae": 1.114578801750206,
+    "ensemble_mae": 0.8014841430543104,
+    "improvement_percent": 29.462310144186667
+  },
+  "optimization_metadata": {
+    "sample_size": 160874,
+    "feature_count": 81,
+    "optimization_date": "2025-09-23T17:13:09.572403"
+  }
+}
