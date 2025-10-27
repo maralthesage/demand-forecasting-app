@@ -6,9 +6,8 @@ import os
 import sys
 import subprocess
 import argparse
-import signal
-import threading
 from pathlib import Path
+import importlib
 
 # Add project root to Python path
 project_root = Path(__file__).parent
@@ -32,15 +31,19 @@ def setup_environment():
 def check_dependencies():
     """Check if required dependencies are installed"""
     try:
-        import streamlit
-        import pandas
-        import numpy
-        import plotly
-        import xgboost
-        import lightgbm
-        import sklearn
-        import schedule
-        import psutil
+        required_modules = [
+            "streamlit",
+            "pandas",
+            "numpy",
+            "plotly",
+            "xgboost",
+            "lightgbm",
+            "sklearn",
+            "schedule",
+            "psutil",
+        ]
+        for module in required_modules:
+            importlib.import_module(module)
 
         print("✅ All dependencies available")
         return True
@@ -85,7 +88,12 @@ def main():
 
     parser = argparse.ArgumentParser(description="Start Demand Forecasting App")
     parser.add_argument("--host", default="0.0.0.0", help="Host address")
-    parser.add_argument("--port", type=int, default=8501, help="Port number")
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8501,
+        help="Port number",
+    )
     parser.add_argument("--data-path", help="Override data path")
     parser.add_argument(
         "--daily-time", default="06:00", help="Daily processing time (HH:MM)"

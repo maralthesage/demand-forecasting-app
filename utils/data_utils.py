@@ -2,12 +2,9 @@
 Data utility functions for sales forecasting
 """
 
-import pandas as pd
 import numpy as np
-from typing import Dict, List, Tuple, Optional, Union
-from pathlib import Path
-import re
-from datetime import datetime, timedelta
+import pandas as pd
+from typing import Dict, List, Optional
 
 from utils.logger import get_logger
 

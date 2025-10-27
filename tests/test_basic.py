@@ -75,9 +75,11 @@ def test_project_structure():
         assert data_dir.is_dir(), f"data path exists but is not a directory: {data_dir}"
         print(f"✅ Data directory found at {data_dir}")
     else:
-        print(
-            f"ℹ️  Data directory not found at {data_dir} (this is expected in CI environments)"
+        message = (
+            "ℹ️  Data directory not found at "
+            f"{data_dir} (this is expected in CI environments)"
         )
+        print(message)
 
 
 if __name__ == "__main__":

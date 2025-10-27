@@ -12,7 +12,9 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 # Set test environment variables
-os.environ["SALES_FORECAST_DATA_PATH"] = str(project_root / "tests" / "test_data")
+os.environ["SALES_FORECAST_DATA_PATH"] = str(
+    project_root / "tests" / "test_data"
+)
 os.environ["LOG_LEVEL"] = "ERROR"  # Reduce logging noise during tests
 
 
