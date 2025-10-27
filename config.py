@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Dict, Any
 
 # Base paths
-BASE_DATA_PATH = "Z:/"
+BASE_DATA_PATH = "app/data/"
 PROJECT_ROOT = Path(__file__).parent
 
 # Data source paths

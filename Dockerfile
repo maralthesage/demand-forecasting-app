@@ -20,8 +20,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Create necessary directories
-RUN mkdir -p cache logs models data
+# Create necessary directories for runtime
+RUN mkdir -p /app/cache /app/logs /app/models /app/data
 
 # Set environment variables
 ENV PYTHONPATH=/app
@@ -30,6 +30,9 @@ ENV STREAMLIT_SERVER_ENABLE_CORS=false
 ENV STREAMLIT_SERVER_ENABLE_XSRF_PROTECTION=false
 ENV STREAMLIT_SERVER_PORT=8501
 ENV STREAMLIT_SERVER_ADDRESS=0.0.0.0
+
+# Set data path to use sample data by default
+ENV SALES_FORECAST_DATA_PATH=/app/data/sample
 
 # Expose port
 EXPOSE 8501

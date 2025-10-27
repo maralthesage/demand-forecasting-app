@@ -6,13 +6,14 @@ services:
     ports:
       - "8501:8501"
     environment:
-      - SALES_FORECAST_DATA_PATH=${SALES_FORECAST_DATA_PATH:-/data}
+      - SALES_FORECAST_DATA_PATH=/app/data/sample
       - PYTHONPATH=/app
     volumes:
+      # Optional: Mount local data directory if you want to use your own data
+      # - ./data:/app/data
+      # Mount cache and logs for persistence (optional)
       - ./cache:/app/cache
       - ./logs:/app/logs
-      - ./models:/app/models
-      - ${SALES_FORECAST_DATA_PATH:-./data}:/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]

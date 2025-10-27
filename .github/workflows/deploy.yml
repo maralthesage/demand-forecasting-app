@@ -1,274 +1,38 @@
-name: CI/CD Pipeline
+name: Basic Tests
 
 on:
   push:
     branches: [ main, develop ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, develop ]
   workflow_dispatch:
-    inputs:
-      force_retrain:
-        description: 'Force model retraining'
-        required: false
-        default: 'false'
-        type: boolean
-
-env:
-  PYTHON_VERSION: '3.9'
-  APP_NAME: demand-forecasting-app
 
 jobs:
-  test:
+  tests:
     runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ env.PYTHON_VERSION }}
-        cache: 'pip'
-    
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-    
-    - name: Lint code
-      run: |
-        echo "🔍 Running code quality checks..."
-        
-        # Check for critical syntax errors only
-        echo "Checking for syntax errors..."
-        python -m py_compile continuous_app.py || echo "Syntax error in continuous_app.py"
-        python -m py_compile config.py || echo "Syntax error in config.py"
-        
-        # Only run linting if the tools are available and we're not in development mode
-        if command -v flake8 &> /dev/null; then
-          echo "Running flake8 linting..."
-          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics --exclude=__pycache__,*.pyc || echo "⚠️ flake8 found issues (continuing in dev mode)"
-        else
-          echo "ℹ️ flake8 not available, skipping linting"
-        fi
-        
-        # Skip black formatting check in development mode to avoid build failures
-        echo "ℹ️ Skipping black formatting check in development mode"
-        echo "✅ Code quality checks completed"
-    
-    - name: Run basic tests
-      run: |
-        # Create test data directory
-        mkdir -p /tmp/test_data
-        
-        # Run basic import tests
-        python -c "
-        try:
-            import streamlit
-            import pandas as pd
-            import numpy as np
-            import plotly
-            import sklearn
-            import xgboost
-            import lightgbm
-            print('✅ All required packages imported successfully')
-        except ImportError as e:
-            print(f'❌ Import error: {e}')
-            exit(1)
-        "
-        
-        # Run basic functionality tests if tests directory exists
-        if [ -d "tests" ] && [ -f "tests/test_basic.py" ]; then
-          python -m pytest tests/test_basic.py -v || echo "Basic tests failed but continuing..."
-        else
-          echo "No basic tests found, skipping test execution"
-        fi
-      env:
-        SALES_FORECAST_DATA_PATH: /tmp/test_data
 
-  build:
-    needs: test
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
-    
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-    
-    - name: Build Docker image
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        push: false
-        tags: ${{ env.APP_NAME }}:latest
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
-        outputs: type=docker,dest=/tmp/image.tar
-    
-    - name: Upload Docker image artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: docker-image
-        path: /tmp/image.tar
-        retention-days: 1
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-  data-processing:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'schedule' || github.event.inputs.force_retrain == 'true'
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ env.PYTHON_VERSION }}
-        cache: 'pip'
-    
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-    
-    - name: Configure environment
-      run: |
-        # Create necessary directories
-        mkdir -p cache logs models data
-        
-        # Set environment variables for testing
-        echo "SALES_FORECAST_DATA_PATH=/tmp/test_data" >> $GITHUB_ENV
-        echo "PYTHONPATH=$PWD" >> $GITHUB_ENV
-    
-    - name: Test data processing
-      run: |
-        echo "🧪 Testing data processing components..."
-        
-        # Test basic imports
-        python -c "
-        from incremental_training_system import incremental_system
-        from config import get_config
-        print('✅ Core modules imported successfully')
-        "
-        
-        # Test configuration loading
-        python -c "
-        from config import get_config
-        config = get_config()
-        print('✅ Configuration loaded successfully')
-        print(f'Data paths: {list(config[\"data_paths\"].keys())}')
-        "
-        
-        echo "✅ Data processing components tested successfully"
-      continue-on-error: true
-    
-    - name: Create processing report
-      run: |
-        echo "# Data Processing Test Report" > processing_report.md
-        echo "Date: $(date)" >> processing_report.md
-        echo "Commit: ${{ github.sha }}" >> processing_report.md
-        echo "Force retrain: ${{ github.event.inputs.force_retrain }}" >> processing_report.md
-        echo "Status: ✅ Components tested successfully" >> processing_report.md
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+          cache: pip
 
-  deploy-staging:
-    needs: [test, build]
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/develop'
-    environment: staging
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Download Docker image
-      uses: actions/download-artifact@v4
-      with:
-        name: docker-image
-        path: /tmp
-    
-    - name: Load Docker image
-      run: docker load --input /tmp/image.tar
-    
-    - name: Deploy to staging
-      run: |
-        echo "🚀 Deploying to staging environment..."
-        echo "✅ Staging deployment completed (simulated)"
-        
-        # In a real deployment, you would:
-        # 1. Push to container registry
-        # 2. Deploy to staging environment
-        # 3. Run health checks
-    
-    - name: Run health check
-      run: |
-        echo "🏥 Running health checks..."
-        sleep 5
-        echo "✅ Health checks passed (simulated)"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install flake8
 
-  deploy-production:
-    needs: [test, build]
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    environment: production
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Download Docker image
-      uses: actions/download-artifact@v4
-      with:
-        name: docker-image
-        path: /tmp
-    
-    - name: Load Docker image
-      run: docker load --input /tmp/image.tar
-    
-    - name: Deploy to production
-      run: |
-        echo "🚀 Deploying to production environment..."
-        echo "✅ Production deployment completed (simulated)"
-        
-        # In a real deployment, you would:
-        # 1. Push to container registry
-        # 2. Deploy to production environment
-        # 3. Run health checks
-    
-    - name: Run production health check
-      run: |
-        echo "🏥 Running production health checks..."
-        sleep 5
-        echo "✅ Production health checks passed (simulated)"
+      - name: Run lint
+        run: flake8 .
 
-  notify:
-    needs: [deploy-production, deploy-staging, data-processing]
-    runs-on: ubuntu-latest
-    if: always()
-    
-    steps:
-    - name: Notify on success
-      if: ${{ needs.deploy-production.result == 'success' || needs.deploy-staging.result == 'success' }}
-      run: |
-        echo "✅ Deployment successful!"
-        echo "🚀 App is ready for use"
-    
-    - name: Notify on failure
-      if: ${{ needs.deploy-production.result == 'failure' || needs.deploy-staging.result == 'failure' }}
-      run: |
-        echo "❌ Deployment failed!"
-        echo "Please check the logs for details"
-
-  cleanup:
-    needs: [deploy-production, deploy-staging]
-    runs-on: ubuntu-latest
-    if: always()
-    
-    steps:
-    - name: Clean up artifacts
-      run: |
-        echo "🧹 Cleaning up artifacts..."
-        echo "✅ Cleanup completed"
+      - name: Run tests
+        env:
+          SALES_FORECAST_DATA_PATH: /tmp/test_data
+        run: |
+          mkdir -p /tmp/test_data
+          python -m pytest -q

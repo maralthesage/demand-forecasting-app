@@ -1,0 +1,60 @@
+# Exclude sensitive data and model weights
+cache/
+logs/
+models/
+
+# Exclude trained models and cached data
+*.joblib
+*.pkl
+*.pickle
+trained_models.joblib
+training_metadata.json
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Environment files
+.env
+env.example
+
+# Docker files (to avoid copying Docker files into the image)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Other temporary files
+*.tmp
+*.temp
+*.log
+
+# Keep sample data for testing - DO NOT exclude data/sample/
