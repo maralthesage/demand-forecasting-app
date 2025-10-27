@@ -64,7 +64,7 @@ jobs:
         env:
           TF_VAR_project_name: demand-forecast
           TF_VAR_environment: dev
-          TF_VAR_location: East US
+          TF_VAR_location: West Europe
           TF_VAR_container_cpu: 1
           TF_VAR_container_memory: 2
           TF_VAR_allowed_ssh_ips: "0.0.0.0/0"
@@ -134,7 +134,7 @@ jobs:
         env:
           TF_VAR_project_name: demand-forecast
           TF_VAR_environment: prod
-          TF_VAR_location: East US
+          TF_VAR_location: West Europe
           TF_VAR_container_cpu: 4
           TF_VAR_container_memory: 8
           TF_VAR_allowed_ssh_ips: ${{ secrets.ALLOWED_SSH_IPS }}
