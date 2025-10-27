@@ -2,33 +2,22 @@
 Ensemble forecasting model combining multiple algorithms
 """
 
-import pandas as pd
-import numpy as np
-from typing import Dict, List, Optional, Tuple, Any
-from sklearn.model_selection import TimeSeriesSplit, cross_val_score
-from sklearn.metrics import mean_absolute_error, mean_squared_error
 import warnings
+from typing import Dict, List, Optional, Tuple
 
-warnings.filterwarnings("ignore")
-
-# Model imports
+import numpy as np
+import pandas as pd
 import xgboost as xgb
 import lightgbm as lgb
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
-from utils.config_loader import config_loader
-
-try:
-    from prophet import Prophet
-
-    PROPHET_AVAILABLE = True
-except ImportError:
-    PROPHET_AVAILABLE = False
-    print("Prophet not available. Install with: pip install prophet")
+from sklearn.model_selection import TimeSeriesSplit, cross_val_score
 
 from models.base_model import BaseForecaster
-from utils.logger import get_logger
 from utils.config_loader import config_loader
+from utils.logger import get_logger
+
+warnings.filterwarnings("ignore")
 
 logger = get_logger(__name__)
 
@@ -38,7 +27,7 @@ class EnsembleForecaster(BaseForecaster):
 
     def __init__(self, models_config: Optional[Dict] = None):
         super().__init__("EnsembleForecaster")
-        
+
         # Load optimized configuration
         if models_config is None:
             optimized_config = config_loader.get_model_config()
@@ -47,7 +36,7 @@ class EnsembleForecaster(BaseForecaster):
         else:
             self.models_config = models_config
             logger.info("Using provided hyperparameters")
-        
+
         # Fallback to default if optimized config is empty
         if not self.models_config:
             self.models_config = {

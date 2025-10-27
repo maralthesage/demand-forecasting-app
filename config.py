@@ -2,7 +2,6 @@
 Configuration settings for the Demand Forecasting Application
 """
 
-import os
 from pathlib import Path
 from typing import Dict, Any
 
@@ -18,8 +17,10 @@ DATA_PATHS = {
         "F03": f"{BASE_DATA_PATH}/CSV/F03/V2SC1010.csv",
         "F04": f"{BASE_DATA_PATH}/CSV/F04/V2SC1010.csv",
     },
-    "marketing_artikel": f"{BASE_DATA_PATH}/CSV/F01/V2AR1001.csv",  # BANUMMER, WARENGR columns
-    "product_descriptions": f"{BASE_DATA_PATH}/CSV/F01/V2AR1002.csv",  # NUMMER, BANAME1, BANAME2 columns
+    # BANUMMER, WARENGR columns
+    "marketing_artikel": f"{BASE_DATA_PATH}/CSV/F01/V2AR1001.csv",
+    # NUMMER, BANAME1, BANAME2 columns
+    "product_descriptions": f"{BASE_DATA_PATH}/CSV/F01/V2AR1002.csv",
     "lager_history": f"{BASE_DATA_PATH}lager_history/",  # To be defined
     "catalog_data": f"{BASE_DATA_PATH}catalog_data/",  # To be defined
     "processed": f"{BASE_DATA_PATH}Data/sales_forecast/",

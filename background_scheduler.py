@@ -9,7 +9,6 @@ import signal
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
-import logging
 from typing import Optional
 import psutil
 import os
@@ -17,7 +16,6 @@ import json
 
 from incremental_training_system import incremental_system
 from utils.logger import get_logger
-from config import get_config
 
 logger = get_logger(__name__)
 
@@ -163,7 +161,7 @@ class BackgroundScheduler:
 
             processing_time = datetime.now() - start_time
 
-            logger.info(f"✅ Daily processing completed successfully!")
+            logger.info("✅ Daily processing completed successfully!")
             logger.info(
                 f"📊 Processed {num_records:,} records for {num_products:,} products"
             )

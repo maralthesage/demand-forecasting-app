@@ -4,7 +4,6 @@ Incremental training system with delta updates and model caching
 
 import pandas as pd
 import numpy as np
-import pickle
 import joblib
 from pathlib import Path
 from datetime import datetime, timedelta
@@ -245,7 +244,6 @@ class IncrementalTrainingSystem:
             logger.error(f"Error loading from cache: {e}")
             raise e
 
-    
     def detect_new_data(self) -> Tuple[bool, pd.DataFrame]:
         """
         Detect new nachfrage data and products since last training
@@ -280,12 +278,20 @@ class IncrementalTrainingSystem:
 
             # Extract new data - FIXED VERSION
             # Create a mask that properly aligns with the DataFrame index
-            current_combinations = list(zip(current_data["product_id"], current_data["MONAT"]))
-            new_data_mask = pd.Series(current_combinations, index=current_data.index).isin(new_keys)
+            current_combinations = list(
+                zip(current_data["product_id"], current_data["MONAT"])
+            )
+            new_data_mask = pd.Series(
+                current_combinations,
+                index=current_data.index,
+            ).isin(new_keys)
             new_data = current_data[new_data_mask].copy()
 
+            product_count = new_data["product_id"].nunique()
             logger.info(
-                f"Detected {len(new_data)} new records for {new_data['product_id'].nunique()} products"
+                "Detected %s new records for %s products",
+                len(new_data),
+                product_count,
             )
 
             return True, new_data
@@ -293,8 +299,7 @@ class IncrementalTrainingSystem:
         except Exception as e:
             logger.error(f"Error detecting new data: {e}")
             return False, pd.DataFrame()
-        
-        
+
     def incremental_update(self) -> Tuple[pd.DataFrame, ProductForecaster]:
         """
         Perform incremental update with new data
@@ -395,16 +400,14 @@ class IncrementalTrainingSystem:
         logger.info("Quick loading for app startup...")
 
         try:
-            # Load optimized configuration
-            optimized_config = config_loader.load_config()
-            
             # Use optimized feature selection
+            config_loader.load_config()
             feature_config = config_loader.get_feature_selection()
-            selected_features = feature_config.get('selected_features', [])
-            
+            selected_features = feature_config.get("selected_features", [])
+
             if selected_features:
                 logger.info(f"Using {len(selected_features)} optimized features")
-            
+
             # Try incremental update first (checks for new data)
             features_data, forecaster = self.incremental_update()
 
@@ -417,7 +420,9 @@ class IncrementalTrainingSystem:
                 feature_columns = self.feature_engineer.select_features(features_data)
 
             logger.info(
-                f"Quick load completed: {len(features_data)} records, {len(feature_columns)} features"
+                "Quick load completed: %s records, %s features",
+                len(features_data),
+                len(feature_columns),
             )
 
             return features_data, forecaster, feature_columns
@@ -462,9 +467,12 @@ class IncrementalTrainingSystem:
                 train_data = fallback_features.dropna(subset=feature_columns)
                 if len(train_data) > 0:
                     fallback_forecaster.fit(train_data, feature_columns)
-            except:
-                # If training fails, create empty forecaster
-                pass
+            except Exception as train_error:
+                logger.warning(
+                    "Fallback forecaster training failed: %s",
+                    train_error,
+                )
+                # Continue with untrained fallback forecaster
 
             logger.info("Fallback data created for app functionality")
             return fallback_features, fallback_forecaster, feature_columns

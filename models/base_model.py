@@ -3,11 +3,12 @@ Base model interface for sales forecasting
 """
 
 from abc import ABC, abstractmethod
-import pandas as pd
-import numpy as np
-from typing import Dict, List, Optional, Tuple, Any
-import joblib
 from pathlib import Path
+from typing import Dict, Optional
+
+import joblib
+import numpy as np
+import pandas as pd
 
 from utils.logger import get_logger
 
